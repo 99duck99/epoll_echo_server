@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
         printf("Usage : %s <port>\n", argv[0]);
         exit(-1);
     }
-
+    /****************서버 소켓 생성*************** */
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     memset(&serv_adr, 0, sizeof(serv_adr));
     serv_adr.sin_family = AF_INET;
@@ -42,9 +42,11 @@ int main(int argc, char *argv[])
     if(listen(serv_sock, 5) == -1)
         error_handling("listen() error");
 
+    /******************epoll 생성 및 크기 초기화****************************/
     epfd = epoll_create(EPOLL_SIZE);
     ep_events = malloc(sizeof(struct epoll_event)*EPOLL_SIZE);
     
+    /******************server socket을 논 블로킹으로 변화******************************************************/
     setnonblockingsock(serv_sock);
     event.events = EPOLLIN;
     event.data.fd = serv_sock;
@@ -52,6 +54,7 @@ int main(int argc, char *argv[])
 
     while(1)
     {
+        /***************변화(이벤트)가 감지된 소켓 검사*********************************************************/
         event_cnt = epoll_wait(epfd, ep_events, EPOLL_SIZE, -1);
         if(event_cnt == -1)
         {
@@ -64,6 +67,7 @@ int main(int argc, char *argv[])
         {
             if(ep_events[i].data.fd == serv_sock)
             {
+                /********클라이언트 소켓 엣지트리거로 변환및 논블로킹 설정***************************************************/
                 adr_sz = sizeof(clnt_adr);
                 clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_adr, &adr_sz);
                 setnonblockingsock(clnt_sock);
@@ -74,6 +78,7 @@ int main(int argc, char *argv[])
             }
             else
             {
+                /***********클라이언트에서 보낸 문자열 읽기및 쓰기****************************************** */
                 memset(buf, 0, sizeof(buf));
                 str_len = read(ep_events[i].data.fd, buf, BUF_SIZE);
                 if(str_len == 0) // close requst
@@ -97,6 +102,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// 소켓을 논블로킹으로 만들기
 void setnonblockingsock(int fd)
 {
     int flag = fcntl(fd, F_GETFL, 0);
